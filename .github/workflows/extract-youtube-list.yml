@@ -1,0 +1,55 @@
+name: 📋 Extract YouTube Video List
+
+on:
+  workflow_dispatch:
+    inputs:
+      youtube_url:
+        description: '🔗 YouTube channel or playlist URL'
+        required: true
+        type: string
+        default: 'https://www.youtube.com/@BBCPersian'
+
+jobs:
+  extract-list:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install yt-dlp
+        run: pip install yt-dlp
+
+      - name: Extract video details
+        run: |
+          URL="${{ github.event.inputs.youtube_url }}"
+          OUTPUT_FILE="youtube-videos-list.txt"
+
+          echo "🔍 Fetching video list from: $URL"
+          echo ""
+
+          # --flat-playlist : فقط لیست را می‌گیرد، ویدیوها را دانلود نمی‌کند
+          # --print         : فرمت خروجی سفارشی
+          yt-dlp \
+            --flat-playlist \
+            --print "%(playlist_index)s. %(title)s\n   🕒 %(duration>%H:%M:%S)s  |  📅 %(upload_date>%Y-%m-%d)s\n   🔗 %(webpage_url)s\n" \
+            "$URL" \
+            > "$OUTPUT_FILE"
+
+          echo "✅ Done! $(wc -l < $OUTPUT_FILE) lines written."
+
+      - name: Commit and push the list
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add youtube-videos-list.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "📋 Update YouTube video list"
+            git push
+            echo "✅ File pushed to repository."
+          else
+            echo "No changes to commit."
+          fi
